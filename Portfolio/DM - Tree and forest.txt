@@ -1,0 +1,183 @@
+
+%pylab inline
+
+import dataiku
+import dataiku.spark as dkuspark
+import pyspark
+from pyspark.sql import SQLContext
+
+# Load PySpark
+sc = pyspark.SparkContext.getOrCreate()
+sqlContext = SQLContext(sc)
+
+# Example: Read the descriptor of a Dataiku dataset
+mydataset = dataiku.Dataset("pokemon_test_binary")
+# And read it as a Spark dataframe
+df = dkuspark.get_dataframe(sqlContext, mydataset)
+
+# Example: Get the count of records in the dataframe
+df.count()
+
+from pyspark.ml import Pipeline
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.feature import HashingTF, Tokenizer
+from pyspark.sql import Row
+from pyspark.sql.functions import UserDefinedFunction
+from pyspark.sql.types import *
+from pyspark.ml.feature import VectorAssembler
+from pyspark.mllib.evaluation import *
+
+#creating vectors with names of variables
+vecAssembler = VectorAssembler(inputCols = ['total', 'hp', 'attack', 'defense'], outputCol="features")
+v_df = vecAssembler.transform(df)
+vhouse_df = v_df.select(['features', 'binaryoutcome'])
+vhouse_df = vhouse_df.withColumnRenamed("binaryoutcome", "label")# We have to rename our output variable to 'label'
+
+#splitting the dataset
+splits = vhouse_df.randomSplit([0.7, 0.3])
+train_df = splits[0]
+test_df = splits[1]
+
+#creating an object with the logistic regression engine
+lr = LogisticRegression(maxIter=20)
+pipeline = Pipeline(stages=[lr])
+
+#fitting the model
+model = lr.fit(train_df)
+
+#evaluating the model using testing data
+result = model.transform(test_df)
+result.prediction
+result.show()
+
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+evaluator = BinaryClassificationEvaluator(rawPredictionCol="rawPrediction")
+AUC_ROC = evaluator.evaluate(result,{evaluator.metricName: "areaUnderROC"})
+print('AUC ROC:' + str(AUC_ROC))
+
+
+
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+
+# Evaluate model
+evaluator = BinaryClassificationEvaluator(rawPredictionCol="rawPrediction")
+evaluator.evaluate(result)
+
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+
+# Create ParamGrid for Cross Validation
+paramGrid = (ParamGridBuilder()
+             .addGrid(lr.regParam, [0.01, 0.5, 2.0])
+             .addGrid(lr.elasticNetParam, [0.0, 0.5, 1.0])
+             .addGrid(lr.maxIter, [1, 5, 10])
+             .build())
+# Create 5-fold CrossValidator
+cv = CrossValidator(estimator=lr, estimatorParamMaps=paramGrid, evaluator=evaluator, numFolds=5)
+
+# Run cross validations
+cvModel = cv.fit(train_df)
+# this will likely take a fair amount of time because of the amount of models that we're creating and testing
+
+# Use test set to measure the accuracy of our model on new data
+predictions = cvModel.transform(test_df)
+
+# cvModel uses the best model found from the Cross Validation
+# Evaluate best model
+evaluator.evaluate(predictions)
+
+print('Model Intercept: ', cvModel.bestModel.intercept)
+weights = cvModel.bestModel.coefficients
+weights = [(float(w),) for w in weights]  # convert numpy type to float, and to tuple
+weightsDF = sqlContext.createDataFrame(weights, ["Feature Weight"])
+weightsDF.show()
+# View best model's predictions and probabilities of each prediction class
+selected = predictions.select("label", "prediction", "probability", "features")
+selected.show()
+
+
+#####################################################
+##### Creating a Gini decision tree ##################
+#####################################################
+
+from pyspark.ml.classification import DecisionTreeClassifier
+
+# Create initial Decision Tree Model
+dt = DecisionTreeClassifier(labelCol="label", featuresCol="features", maxDepth=3)
+
+# Train model with Training Data
+dtModel = dt.fit(train_df)
+
+
+#We can extract the number of nodes in our decision tree as well as the tree depth of our model.
+print("numNodes = ", dtModel.numNodes)
+print("depth = ", dtModel.depth)
+
+
+# Make predictions on test data using the Transformer.transform() method.
+predictions = dtModel.transform(test_df)
+predictions.printSchema()
+# View model's predictions and probabilities of each prediction class
+selected = predictions.select("label", "prediction", "probability", "features")
+selected.show()
+
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+# Evaluate model
+evaluator = BinaryClassificationEvaluator()
+evaluator.evaluate(predictions)
+
+
+dt.getImpurity()
+
+##################################################################
+############ Random forest on Las Vegas ##########################
+##################################################################
+
+from pyspark.ml.classification import RandomForestClassifier
+
+# Create an initial RandomForest model.
+rf = RandomForestClassifier(labelCol="label", featuresCol="features")
+
+# Train model with Training Data
+rfModel = rf.fit(train_df)
+# Make predictions on test data using the Transformer.transform() method.
+predictions = rfModel.transform(test_df)
+predictions.printSchema()
+# View model's predictions and probabilities of each prediction class
+selected = predictions.select("label", "prediction", "probability", "features")
+selected.show()
+
+##################################################
+###### Evaluating the Random Forest ##############
+####################################################
+
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+
+# Evaluate model
+evaluator = BinaryClassificationEvaluator()
+evaluator.evaluate(predictions)
+
+
+
+# Create ParamGrid for Cross Validation
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+
+paramGrid = (ParamGridBuilder()
+             .addGrid(rf.maxDepth, [2, 4, 6])
+             .addGrid(rf.maxBins, [20, 60])
+             .addGrid(rf.numTrees, [5, 20])
+             .build())
+# Create 5-fold CrossValidator
+cv = CrossValidator(estimator=rf, estimatorParamMaps=paramGrid, evaluator=evaluator, numFolds=5)
+
+# Run cross validations.  This can take about 6 minutes since it is training over 20 trees!
+cvModel = cv.fit(train_df)
+# Use test set here so we can measure the accuracy of our model on new data
+predictions = cvModel.transform(test_df)
+# cvModel uses the best model found from the Cross Validation
+# Evaluate best model
+evaluator.evaluate(predictions)
+# View Best model's predictions and probabilities of each prediction class
+selected = predictions.select("label", "prediction", "probability", "features")
+selected.show()
+
+

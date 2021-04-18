@@ -43,8 +43,8 @@ library(RColorBrewer)
 #### Loading and transforming Data ####
 
 # Importing all .doc files from one directory
-setwd("C:/Users/Haolin/Documents/NLP_cleaned")
-nm <- list.files(path="C:/Users/Haolin/Documents/NLP_cleaned")
+setwd("C:/Users/Pierre/Documents/Hult/Master in Business Analytics/Text Analytics and Natural Language Processing (NLP)/NLP Similation Notes/cleaned")
+nm <- list.files(path="C:/Users/Pierre/Documents/Hult/Master in Business Analytics/Text Analytics and Natural Language Processing (NLP)/NLP Similation Notes/cleaned")
 my_doc_text <- do.call(rbind, lapply(nm, function(x) read_docx(file=x)))
 
 #binding al text together

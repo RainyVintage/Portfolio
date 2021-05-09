@@ -1,0 +1,33 @@
+# Python 3.8 env
+
+#conda create -y --force -n ag python=3.8 pip
+#conda activate ag
+
+#install autogluon
+
+pip install "mxnet<2.0.0"
+pip install autogluon
+
+#install kaggle
+
+pip install kaggle
+unzip -o titanic.zip
+
+from autogluon.tabular import TabularDataset,TabularPredictor
+
+#train
+
+train_data = TabularDataset('train.csv')
+id, label = 'PassengerId', 'Survived'
+predictor = TabularPredictor(label= label).fit(
+  train_data.drop(columns=[id]))
+  
+import pandas as pd
+#prediction
+
+test_data = Tabular
+preds = predictor.predict(test_data.drop(columns=[id]))
+
+#save
+result = pd.DataFrame({id:test_data[id], label:preds})
+result.to_csv('result.csv', index= False)

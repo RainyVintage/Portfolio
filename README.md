@@ -13,3 +13,6 @@ Here is Haolin's portfolio
 
 ### Finance folder includes all finance- related coding project
 ### Data Visualization folder inclues some personal examples from Tableau or published on Tableau Public
+
+## End
+I'm actively applying for Data Scientist job right now. Open to DS opportunites at any level. Reply within 12 hours.

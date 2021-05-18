@@ -11,6 +11,7 @@ pip install autogluon
 #install kaggle
 
 pip install kaggle
+download c titanic
 unzip -o titanic.zip
 
 from autogluon.tabular import TabularDataset,TabularPredictor

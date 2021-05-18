@@ -24,9 +24,10 @@ predictor = TabularPredictor(label= label).fit(
   train_data.drop(columns=[id]))
   
 import pandas as pd
+
 #prediction
 
-test_data = Tabular
+test_data = TabularDataset('test.csv')
 preds = predictor.predict(test_data.drop(columns=[id]))
 
 #save

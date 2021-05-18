@@ -33,3 +33,31 @@ preds = predictor.predict(test_data.drop(columns=[id]))
 #save
 result = pd.DataFrame({id:test_data[id], label:preds})
 result.to_csv('result.csv', index= False)
+
+-----------------------------
+# California housing price
+
+# import libs
+import numpy as np
+import pandas as pd
+from autogluon.tabular import TabularDataset, TabularPredictor
+
+# dataset
+train_data = TabularDataset('train.csv')
+test_data = TabularDataset('test.csv')
+id, label = 'Id', 'Sold Price'
+large_val_cols = ['Lot', 'Total interior livable area',
+                  'Tax assessed value', 'Annual tax amount',
+                  'Listed Price', 'Last Sold Price']
+for c in large_val_cols + [label]:
+    train_data[c] = np.log(train_data[c] + 1)
+
+# train
+predictor = TabularPredictor(label=label).fit(train_data.drop(columns=[id]))
+                 #hyperparameters='multimodal', # use multimodal when has GPU
+
+preds = predictor.predict(test_data.drop(columns=[id]))
+
+#save
+result = pd.DataFrame({id:test_data[id], label:preds})
+result.to_csv('result.csv', index= False)
